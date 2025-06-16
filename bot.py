@@ -1,7 +1,7 @@
 import json
 import random
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import aiosqlite
 
 TOKEN = "8179513289:AAE89mACc9yUr4cgg1lq3NMsuoG10EkqisU"
@@ -46,14 +46,20 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     correct_answer = question[2]
     wrong_answers = question[3].split(';')
 
-    options = wrong_answers + [correct_answer, "↩️ Главное меню"]
+    options = wrong_answers + [correct_answer]
     random.shuffle(options)
 
     context.user_data['correct_answer'] = correct_answer
 
+    # Создание Inline-кнопок вместо обычных кнопок
+    keyboard = [
+        [InlineKeyboardButton(text=option, callback_data=option)] for option in options
+    ]
+    keyboard.append([InlineKeyboardButton(text="↩️ Главное меню", callback_data="main_menu")])
+
     await update.message.reply_text(
         question[1],
-        reply_markup=ReplyKeyboardMarkup([options], one_time_keyboard=True, resize_keyboard=True)
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -135,6 +141,35 @@ async def handle_marking(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(response, parse_mode='Markdown')
 
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_answer = query.data
+    correct_answer = context.user_data.get('correct_answer')
+
+    if user_answer == "main_menu":
+        await show_main_menu(query, context)
+        return
+
+    async with aiosqlite.connect('eco_bot.db') as db:
+        if user_answer == correct_answer:
+            response = "🎉 Правильно! Ты получаешь 1 балл."
+            user_id = query.from_user.id
+            username = query.from_user.username
+            await db.execute(
+                'INSERT OR IGNORE INTO users (user_id, username, score) VALUES (?, ?, 0)', 
+                (user_id, username)
+            )
+            await db.execute('UPDATE users SET score = score + 1 WHERE user_id = ?', (user_id,))
+            await db.commit()
+        else:
+            response = f"❌ Неправильно. Правильный ответ: {correct_answer}"
+
+    await query.edit_message_text(text=response)
+
+    await show_main_menu(query, context)
+
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -143,6 +178,9 @@ def main():
     app.add_handler(CommandHandler("quiz", quiz))
     app.add_handler(CommandHandler("leaderboard", leaderboard))
     app.add_handler(CommandHandler("help", help_command))
+
+    # Обработчик inline-кнопок добавляем тут:
+    app.add_handler(CallbackQueryHandler(button))
 
     app.add_handler(MessageHandler(filters.Regex('^(📝 Пройти тест|🔎 Узнать о маркировке|📚 Шпаргалка по маркировкам|🏆 Рейтинг пользователей)$'), handle_main_menu_buttons))
     app.add_handler(MessageHandler(filters.Regex('^↩️ Главное меню$'), show_main_menu))
