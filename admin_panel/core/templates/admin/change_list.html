@@ -1,0 +1,35 @@
+{% extends 'admin/change_list.html' %}
+
+{% block content %}
+{{ block.super }}
+
+<canvas id="chart" width="800" height="400"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('chart').getContext('2d');
+const data = {
+    labels: [{% for stat in cl.queryset %}'{{ stat.date }}',{% endfor %}],
+    datasets: [
+        {
+            label: 'Новые пользователи',
+            backgroundColor: 'rgb(54, 162, 235)',
+            borderColor: 'rgb(54, 162, 235)',
+            data: [{% for stat in cl.queryset %}{{ stat.new_users }},{% endfor %}],
+        },
+        {
+            label: 'Пройдено тестов',
+            backgroundColor: 'rgb(255, 99, 132)',
+            borderColor: 'rgb(255, 99, 132)',
+            data: [{% for stat in cl.queryset %}{{ stat.quizzes_taken }},{% endfor %}],
+        },
+    ]
+};
+
+new Chart(ctx, {
+    type: 'line',
+    data: data,
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+});
+</script>
+{% endblock %}
