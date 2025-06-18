@@ -1,3 +1,22 @@
-git add .github/workflows/backup.yml
-git commit -m "Добавлен workflow автоматического бекапа через GitHub Actions"
-git push origin main
+name: Backup Database and Code
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # ежедневно в полночь
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Backup
+        run: |
+          zip -r backup.zip admin_panel eco_bot.db bot.py recycling_data.json
+
+      - name: Upload Backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup
+          path: backup.zip
