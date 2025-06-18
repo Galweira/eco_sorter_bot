@@ -2,7 +2,7 @@ name: Backup Database and Code
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # ежедневно в полночь
+    - cron: '0 0 * * *'  # ежедневно в полночь (тест)
   workflow_dispatch:
 
 jobs:
